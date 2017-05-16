@@ -2,8 +2,8 @@
 import os
 import sys
 import string
+from ast import literal_eval
 from shlex import shlex
-
 
 # Useful for very coarse version differentiation.
 PY3 = sys.version_info[0] == 3
@@ -51,6 +51,22 @@ class Config(object):
 
         return self._BOOLEANS[value.lower()]
 
+    def _cast_dict(self, value):
+        """
+        Helper to convert config values to dictionaries.
+        """
+        value = str(value)
+
+        try:
+            assert value.startswith('{')  # sanity check
+            assert value.endswith('}')
+
+            dic = literal_eval(value)
+        except AssertionError:
+            dic = value
+
+        return dic
+
     def get(self, option, default=undefined, cast=undefined):
         """
         Return the value for option or default if defined.
@@ -61,12 +77,15 @@ class Config(object):
             value = default
 
         if isinstance(value, Undefined):
-            raise UndefinedValueError('%s option not found and default value was not defined.' % option)
+            raise UndefinedValueError(
+                '%s option not found and default value was not defined.' % option)
 
         if isinstance(cast, Undefined):
             cast = lambda v: v  # nop
         elif cast is bool:
             cast = self._cast_boolean
+        elif cast is dict:
+            cast = self._cast_dict
 
         return cast(value)
 
@@ -78,6 +97,7 @@ class Config(object):
 
 
 class RepositoryBase(object):
+
     def __init__(self, source):
         raise NotImplementedError
 
@@ -111,6 +131,7 @@ class RepositoryEnv(RepositoryBase):
     """
     Retrieves option keys from .env files with fall back to os.environ.
     """
+
     def __init__(self, source):
         self.data = {}
 
@@ -134,6 +155,7 @@ class RepositoryShell(RepositoryBase):
     """
     Retrieves option keys from os.environ.
     """
+
     def __init__(self, source=None):
         pass
 
@@ -229,4 +251,3 @@ class Csv(object):
         splitter.whitespace_split = True
 
         return [transform(s) for s in splitter]
-
